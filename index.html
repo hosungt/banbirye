@@ -287,7 +287,13 @@
 
   // ===== LaTeX =====
   function formatA(a){ return Number.isInteger(a) ? String(a) : a.toFixed(2).replace(/\.?0+$/,''); }
-  function latexForInv(a){ return `y = \\frac{${formatA(a)}}{x}`; }
+ function latexForInv(a){
+  const absA = Math.abs(a);
+  const num  = formatA(absA);                 // 8, 4, 3.5 등
+  const frac = `\\frac{${num}}{x}`;           // \frac{8}{x}
+  return a < 0 ? `y = -${frac}` : `y = ${frac}`;
+}
+
   function renderQuestionInv(){
     const el = document.getElementById('qMath');
     if (!el || !window.katex) return;
