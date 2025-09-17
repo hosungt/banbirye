@@ -156,6 +156,14 @@
     </div>
 
     <div class="panel" id="rightPanel"></div>
+
+    <!-- ✅ 리더보드 패널: 항상 유지, 최근 10판 -->
+    <div class="panel" id="leaderboardPanel" style="grid-column: 1 / -1;">
+      <h3 style="margin-top:0;">리더보드 (최근 10판)</h3>
+      <div id="leaderboardBody" style="font-size:14px; color:#374151;">
+        아직 기록이 없습니다.
+      </div>
+    </div>
   </div>
 
   <script>
@@ -285,6 +293,57 @@
 
   const CONNECT_MIN_MATCH = 5;  // 5개 이상
 
+  // ✅ 세션 리더보드(새로고침 시 초기화)
+  const leaderboard = {
+    eq: [],    // 식→그래프 기록
+    graph: []  // 그래프→식 기록
+  };
+  function addRecord(mode, score) {
+    const arr = leaderboard[mode];
+    arr.unshift({ score, at: new Date().toISOString() });
+    if (arr.length > 10) arr.length = 10;
+    renderLeaderboard();
+  }
+  function renderLeaderboard() {
+    const box = document.getElementById('leaderboardBody');
+    if (!box) return;
+    const fmt = (iso) => {
+      try { return new Date(iso).toLocaleString(); } catch { return iso; }
+    };
+    const section = (title, items) => {
+      if (!items || items.length === 0) {
+        return `
+          <div style="margin:8px 0 2px; font-weight:700;">${title}</div>
+          <div style="color:#6b7280;">기록 없음</div>
+        `;
+      }
+      const rows = items.map((r, i) => `
+        <tr>
+          <td style="padding:6px 8px; width:3ch; text-align:right; color:#6b7280;">${i+1}</td>
+          <td style="padding:6px 8px; font-weight:700;">${r.score}점</td>
+          <td style="padding:6px 8px; color:#6b7280;">${fmt(r.at)}</td>
+        </tr>
+      `).join('');
+      return `
+        <div style="margin:8px 0 6px; font-weight:700;">${title}</div>
+        <table style="border-collapse:collapse; width:100%; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden;">
+          <thead>
+            <tr style="background:#f9fafb;">
+              <th style="padding:6px 8px; text-align:right; width:3ch; color:#6b7280;">#</th>
+              <th style="padding:6px 8px; text-align:left;">점수</th>
+              <th style="padding:6px 8px; text-align:left;">기록 시각</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    };
+    box.innerHTML = [
+      section('식을 그래프로 바꾸기', leaderboard.eq),
+      section('그래프를 식으로 바꾸기', leaderboard.graph)
+    ].join('');
+  }
+
   // ===== LaTeX =====
   function formatA(a){ return Number.isInteger(a) ? String(a) : a.toFixed(2).replace(/\.?0+$/,''); }
   function latexForInv(a){
@@ -293,7 +352,6 @@
     const frac = `\\frac{${num}}{x}`;
     return a < 0 ? `y = -${frac}` : `y = ${frac}`;
   }
-
   function renderQuestionInv(){
     const el = document.getElementById('qMath');
     if (!el || !window.katex) return;
@@ -624,6 +682,10 @@
 
   function finishGame(){
     resetAllTimers();
+
+    // ✅ 리더보드 기록 추가(식→그래프)
+    addRecord('eq', state.score);
+
     setRightPanel(`
       <h3>결과</h3>
       <p style="font-size:16px;">최종 점수: <b>${state.score}</b>점</p>
@@ -687,7 +749,6 @@
   function countMatches(a){ let c=0; for (const p of state.points) if (onCurve(p,a)) c++; return c; }
 
   function connectPointsToCurve(){
-    // 1) 현재 찍힌 점들 중, 어떤 a가 가장 잘 맞는지 후보를 고른다.
     let bestA = null, bestCount = -1;
     for (const a of INV_COEFFS) {
       const c = countMatches(a);
@@ -710,9 +771,7 @@
       for (let i = 0; i < state.points.length; i++) {
         if (!onCurve(state.points[i], bestA)) bad.push(i);
       }
-      if (bad.length > 0) {
-        flashBadPoints(bad, 3000, 250);
-      }
+      if (bad.length > 0) { flashBadPoints(bad, 3000, 250); }
       showToast(`아직 찍지 않은 정수 격자점이 있기 때문에 그래프를 그릴 수 없어요. (남은 점 ${missing.length}개)`, 'bad', 2800);
       render(null);
       return false;
@@ -728,9 +787,7 @@
     }
     if (bad.length > 0) {
       flashBadPoints(bad, 3000, 250);
-      setTimeout(() => {
-        showToast('이 점들은 그래프 위에 있지 않아요. 점의 위치를 조정해주세요.', 'bad', 2000);
-      }, 3000);
+      setTimeout(() => { showToast('이 점들은 그래프 위에 있지 않아요. 점의 위치를 조정해주세요.', 'bad', 2000); }, 3000);
     }
 
     return true;
@@ -841,7 +898,7 @@
 
     document.getElementById('gInput').addEventListener('input', (e)=>{
       const v = parseK(e.target.value);
-      // (라이브 미리보기 원하면 여기서 렌더를 추가할 수 있어요)
+      // (원하면 라이브 미리보기 추가 가능)
     });
   }
 
@@ -863,6 +920,10 @@
   }
   function finishGraphGame(){
     resetAllTimers();
+
+    // ✅ 리더보드 기록 추가(그래프→식)
+    addRecord('graph', state.score);
+
     setRightPanel(`
       <h3>결과</h3>
       <p style="font-size:16px;">최종 점수: <b>${state.score}</b>점</p>
@@ -928,6 +989,8 @@
 
   window.addEventListener('DOMContentLoaded', ()=>{
     startExplore();
+    renderLeaderboard(); // ✅ 첫 로딩 시 리더보드 표시
+
     document.addEventListener('input', (e)=>{
       if (state.mode!=='idle') return;
       if (e.target && e.target.id === 'kInput'){
