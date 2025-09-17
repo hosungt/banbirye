@@ -108,7 +108,7 @@
       margin-left: 4px;
     }
     .frac-ui .num-input{
-      width: clamp(7ch, 9vw, 10ch);                /* 4자리 + 부호 충분 */
+      width: clamp(7ch, 9vw, 10ch);
       height: clamp(36px, 4.5vw, 48px);
       font-size: clamp(22px, 2.8vw, 30px);
       text-align: center;
@@ -117,11 +117,11 @@
       border: 2px solid #cbd5e1;
       border-radius: 10px;
       outline: none;
-      caret-color: #111827;                        /* 커서 색 명확히 */
+      caret-color: #111827;
     }
     .frac-ui .bar{
       width: 100%;
-      height: 3px;                                 /* bar를 더 두껍게 */
+      height: 3px;
       background: #111827;
       margin: 2px 0;
       border-radius: 2px;
@@ -283,16 +283,16 @@
   const GRAPH_GAME_LEN = 10;
   const GRAPH_PER_PROBLEM_TIME = 30;
 
-  const CONNECT_MIN_MATCH = 5;  // (요청) 5개 이상
+  const CONNECT_MIN_MATCH = 5;  // 5개 이상
 
   // ===== LaTeX =====
   function formatA(a){ return Number.isInteger(a) ? String(a) : a.toFixed(2).replace(/\.?0+$/,''); }
- function latexForInv(a){
-  const absA = Math.abs(a);
-  const num  = formatA(absA);                 // 8, 4, 3.5 등
-  const frac = `\\frac{${num}}{x}`;           // \frac{8}{x}
-  return a < 0 ? `y = -${frac}` : `y = ${frac}`;
-}
+  function latexForInv(a){
+    const absA = Math.abs(a);
+    const num  = formatA(absA);
+    const frac = `\\frac{${num}}{x}`;
+    return a < 0 ? `y = -${frac}` : `y = ${frac}`;
+  }
 
   function renderQuestionInv(){
     const el = document.getElementById('qMath');
@@ -686,62 +686,56 @@
   function onCurve(p, a, eps=1e-6) { if (p.x === 0) return false; const y = a / p.x; return Math.abs(p.y - y) < eps; }
   function countMatches(a){ let c=0; for (const p of state.points) if (onCurve(p,a)) c++; return c; }
 
-function connectPointsToCurve(){
-  // 1) 현재 찍힌 점들 중, 어떤 a가 가장 잘 맞는지 후보를 고른다.
-  let bestA = null, bestCount = -1;
-  for (const a of INV_COEFFS) {
-    const c = countMatches(a);
-    if (c > bestCount) { bestCount = c; bestA = a; }
-  }
+  function connectPointsToCurve(){
+    // 1) 현재 찍힌 점들 중, 어떤 a가 가장 잘 맞는지 후보를 고른다.
+    let bestA = null, bestCount = -1;
+    for (const a of INV_COEFFS) {
+      const c = countMatches(a);
+      if (c > bestCount) { bestCount = c; bestA = a; }
+    }
 
-  // 안전장치: 후보 없으면 실패 처리
-  if (bestA === null) {
-    state.curveA = null; state.curveDrawn = false;
-    showToast('점을 잘못 찍었어요. 식을 다시 한 번 확인해주세요.', 'bad', 2200);
-    render(null);
-    return false;
-  }
+    if (bestA === null) {
+      state.curveA = null; state.curveDrawn = false;
+      showToast('점을 잘못 찍었어요. 식을 다시 한 번 확인해주세요.', 'bad', 2200);
+      render(null);
+      return false;
+    }
 
-  // 2) 그 후보 a에 대해, ±9 범위에서 "그래프가 지나는 모든 정수 격자점" 목록을 만든다.
-  const need = requiredIntegerPoints(bestA);         // [{x,y}, ...]
-  // 3) 아직 안 찍은 점(필수인데 없는 점) 개수 계산
-  const missing = need.filter(pt => !hasPoint(state.points, pt));
+    const need = requiredIntegerPoints(bestA);
+    const missing = need.filter(pt => !hasPoint(state.points, pt));
 
-  // 4) 하나라도 빠져 있으면, 그래프를 그리지 않고 개수만 알려준다.
-  if (missing.length > 0) {
-    state.curveA = null; state.curveDrawn = false;
-    // 화면에 보이는 도움: 현재 a 기준으로 그래프 위가 아닌 점들 반짝이게
+    if (missing.length > 0) {
+      state.curveA = null; state.curveDrawn = false;
+      const bad = [];
+      for (let i = 0; i < state.points.length; i++) {
+        if (!onCurve(state.points[i], bestA)) bad.push(i);
+      }
+      if (bad.length > 0) {
+        flashBadPoints(bad, 3000, 250);
+      }
+      showToast(`아직 찍지 않은 정수 격자점이 있기 때문에 그래프를 그릴 수 없어요. (남은 점 ${missing.length}개)`, 'bad', 2800);
+      render(null);
+      return false;
+    }
+
+    state.curveA = bestA;
+    state.curveDrawn = true;
+    render(state.curveA);
+
     const bad = [];
     for (let i = 0; i < state.points.length; i++) {
-      if (!onCurve(state.points[i], bestA)) bad.push(i);
+      if (!onCurve(state.points[i], state.curveA)) bad.push(i);
     }
     if (bad.length > 0) {
       flashBadPoints(bad, 3000, 250);
+      setTimeout(() => {
+        showToast('이 점들은 그래프 위에 있지 않아요. 점의 위치를 조정해주세요.', 'bad', 2000);
+      }, 3000);
     }
-    showToast(`아직 찍지 않은 정수 격자점이 있기 때문에 그래프를 그릴 수 없어요. (남은 점 ${missing.length}개)`, 'bad', 2800);
-    render(null);
-    return false;
+
+    return true;
   }
 
-  // 5) 모든 필수 격자점을 다 찍었다면, 곡선 그리기 OK
-  state.curveA = bestA;
-  state.curveDrawn = true;
-  render(state.curveA);
-
-  // 6) (선택) 필수점은 다 있지만, 그래프 위가 아닌 "여분/오류" 점이 있다면 알려주기
-  const bad = [];
-  for (let i = 0; i < state.points.length; i++) {
-    if (!onCurve(state.points[i], state.curveA)) bad.push(i);
-  }
-  if (bad.length > 0) {
-    flashBadPoints(bad, 3000, 250);
-    setTimeout(() => {
-      showToast('이 점들은 그래프 위에 있지 않아요. 점의 위치를 조정해주세요.', 'bad', 2000);
-    }, 3000);
-  }
-
-  return true;
-}
   // 정수 격자점(±9)
   function requiredIntegerPoints(a){
     const req = [];
@@ -804,22 +798,41 @@ function connectPointsToCurve(){
       </div>
       <div class="hint">왼쪽 곡선은 <span id="gHintKatex"></span> 입니다. 분자 a 값을 입력하세요.</div>
 
- <div class="expr-row" id="gExprRow">
-    <span class="expr-y">y</span>
-    <span class="expr-eq">=</span>
-    <div class="frac-ui">
-      <input id="gInput" class="num-input" type="text"
-             inputmode="decimal" autocomplete="off" aria-label="분자 a 값" />
-      <div class="bar"></div>
-      <div class="denom">x</div>
-    </div>
-  </div>
-  <div class="controls" style="margin-top:10px;">
-    <button id="gCheckBtn" class="btn">확인</button>
-  </div>
+      <div class="expr-row" id="gExprRow">
+        <span class="expr-y">y</span>
+        <span class="expr-eq">=</span>
+        <div class="frac-ui">
+          <input id="gInput" class="num-input" type="text"
+                 inputmode="decimal" autocomplete="off" aria-label="분자 a 값" />
+          <div class="bar"></div>
+          <div class="denom">x</div>
+        </div>
+      </div>
+      <div class="controls" style="margin-top:10px;">
+        <button id="gCheckBtn" class="btn">확인</button>
+      </div>
     `);
 
- 
+    // ✅ 문제 시작 시 즉시 입력 가능 & Enter로 확인
+    setTimeout(() => {
+      const gInput = document.getElementById('gInput');
+      if (gInput) {
+        gInput.setAttribute('inputmode','decimal');
+        gInput.setAttribute('autocomplete','off');
+        gInput.setAttribute('autocapitalize','off');
+        gInput.focus();
+        gInput.select();
+
+        gInput.addEventListener('keydown', (e) => {
+          if (e.isComposing) return;    // IME 조합 중 Enter 무시
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('gCheckBtn')?.click();
+          }
+        });
+      }
+    }, 0);
+
     const gh = document.getElementById('gHintKatex');
     if (gh && window.katex) { window.katex.render('y = \\frac{a}{x}', gh, {throwOnError:false}); }
 
@@ -827,7 +840,8 @@ function connectPointsToCurve(){
     state.timeLeft = GRAPH_PER_PROBLEM_TIME; updateHUD(); startTimerGraph();
 
     document.getElementById('gInput').addEventListener('input', (e)=>{
-      const v = parseK(e.target.value); 
+      const v = parseK(e.target.value);
+      // (라이브 미리보기 원하면 여기서 렌더를 추가할 수 있어요)
     });
   }
 
@@ -878,9 +892,10 @@ function connectPointsToCurve(){
         showToast(`정답! +${add}점`, 'ok', 1200);
         state.problemIndex++; nextProblemGraph();
       } else {
-        state.timeLeft = Math.max(0, state.timeLeft - 10);
+        // ✅ 오답 패널티 -5초
+        state.timeLeft = Math.max(0, state.timeLeft - 5);
         if (state.timeLeft <= 0){ state.timeLeft = 0; updateHUD(); resetAllTimers(); showCorrectFor5sGraph(); }
-        else { updateHUD(); showToast('오답! 남은 시간 -10초. 다시 시도해 보세요.', 'bad', 3000); }
+        else { updateHUD(); showToast('오답! 남은 시간 -5초. 다시 시도해 보세요.', 'bad', 3000); }
       }
       return;
     }
@@ -891,11 +906,25 @@ function connectPointsToCurve(){
     if (state.mode==='idle'){
       fitAndDraw(document.getElementById('kInput')?.value);
     } else {
+      // 그래프 유지: 그래프→식이면 현재 문제 a, 식→그래프에서 그린 곡선은 유지
       render(state.curveDrawn ? state.curveA : (state.mode==='graph' ? state.a : null));
     }
     fixedFormulaScale = null;
     if (lastFormula.active) showFormula(lastFormula.a, lastFormula.where);
   });
+
+  // ✅ 태블릿/모바일 온스크린 키보드로 인한 viewport 변화까지 커버
+  if ('visualViewport' in window) {
+    window.visualViewport.addEventListener('resize', ()=>{
+      if (state.mode==='idle'){
+        fitAndDraw(document.getElementById('kInput')?.value);
+      } else {
+        render(state.curveDrawn ? state.curveA : (state.mode==='graph' ? state.a : null));
+      }
+      fixedFormulaScale = null;
+      if (lastFormula.active) showFormula(lastFormula.a, lastFormula.where);
+    }, { passive: true });
+  }
 
   window.addEventListener('DOMContentLoaded', ()=>{
     startExplore();
