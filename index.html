@@ -157,9 +157,9 @@
 
     <div class="panel" id="rightPanel"></div>
 
-    <!-- ✅ 리더보드 패널: 항상 유지, 최근 10판 -->
+    <!-- ✅ 리더보드 패널: 항상 유지, 상위 10판 -->
     <div class="panel" id="leaderboardPanel" style="grid-column: 1 / -1;">
-      <h3 style="margin-top:0;">리더보드 (최근 10판)</h3>
+      <h3 style="margin-top:0;">리더보드 (상위 10판)</h3>
       <div id="leaderboardBody" style="font-size:14px; color:#374151;">
         아직 기록이 없습니다.
       </div>
@@ -298,12 +298,22 @@
     eq: [],    // 식→그래프 기록
     graph: []  // 그래프→식 기록
   };
-  function addRecord(mode, score) {
-    const arr = leaderboard[mode];
-    arr.unshift({ score, at: new Date().toISOString() });
-    if (arr.length > 10) arr.length = 10;
-    renderLeaderboard();
-  }
+function addRecord(mode, score) {
+  const arr = leaderboard[mode];
+
+  // 1) 새 기록 추가 (동점 정렬을 위해 타임스탬프 함께 저장)
+  arr.push({ score, at: Date.now() });
+
+  // 2) 점수 내림차순 정렬, 동점이면 최신(at 큰 값) 우선
+  arr.sort((a, b) => (b.score - a.score) || (b.at - a.at));
+
+  // 3) 상위 10개만 유지
+  if (arr.length > 10) arr.length = 10;
+
+  // 4) 리렌더
+  renderLeaderboard();
+}
+
   function renderLeaderboard() {
     const box = document.getElementById('leaderboardBody');
     if (!box) return;
